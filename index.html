@@ -1,194 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>The Time Game</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 10px;
-      padding: 0;
-      background-color: #f0f0f0;
-    }
-
-    h2 {
-      text-align: center;
-    }
-
-    .instructions {
-      text-align: center;
-      margin-bottom: 15px;
-    }
-
-    .counter {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-
-    .chips-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 6px;
-      margin: 10px 0 20px;
-    }
-
-    .chip {
-      width: 40px;
-      height: 40px;
-      background-color: #4CAF50;
-      color: white;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      user-select: none;
-      cursor: pointer;
-    }
-
-    .chip.selected {
-      border: 2px solid #000;
-      background-color: #388E3C;
-    }
-
-    .circles-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-around;
-      gap: 20px;
-    }
-
-    .circle-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Time Game</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 10px;
+    background: #f0f0f0;
+  }
+  h2,
+  .instructions,
+  .counter {
+    text-align: center;
+  }
+  .chips-container,
+  .circles-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 10px 0;
+  }
+  .chip {
+    width: 40px;
+    height: 40px;
+    background: #4caf50;
+    color: white;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: grab;
+    user-select: none;
+  }
+  .drop-circle {
+    width: 90px;
+    height: 90px;
+    border: 3px dashed #aaa;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 4px;
+    gap: 4px;
+    overflow-y: auto;
+  }
+  .drop-circle .chip {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: grab;
+  }
+  input.label-box {
+    width: 90px;
+    margin-top: 6px;
+    padding: 4px;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  @media (max-width: 600px) {
     .drop-circle {
-      width: 90px;
-      height: 90px;
-      border: 3px dashed #aaa;
-      border-radius: 50%;
-      background-color: white;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      justify-content: flex-start;
-      padding: 4px;
-      gap: 4px;
-      overflow: auto;
+      width: 70px;
+      height: 70px;
     }
-
-    .drop-circle .chip {
-      width: 26px;
-      height: 26px;
-      font-size: 12px;
-      border-radius: 4px;
-      background-color: #4CAF50;
-      color: white;
-      cursor: default;
+    .chip {
+      width: 36px;
+      height: 36px;
     }
-
-    input.label-box {
-      margin-top: 8px;
-      padding: 4px;
-      text-align: center;
-      width: 90px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-    }
-
-    @media (max-width: 600px) {
-      .drop-circle {
-        width: 70px;
-        height: 70px;
-      }
-      .chip {
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
-      }
-    }
-  </style>
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 </head>
 <body>
   <h2>The Time Game</h2>
   <div class="instructions">
-    Drag the 1-hour “chips” into the circles to indicate how much time you’re spending doing each “activity” (right now, during the summer). You pick the labels for each circle.
+    Drag the 1-hour “chip” into the circles to indicate how much time you’re spending doing each “activity” (right now, during the summer). You pick the labels for each circle.
   </div>
-
   <div class="counter">
-    Chips remaining: <span id="chipCount">24</span>
+    Chips used: <span id="chipUsed">0</span> / 24
   </div>
 
-  <div class="chips-container" id="chipsContainer">
-    <!-- Chips will be generated -->
+  <div id="bank" class="chips-container">
+    <div class="chip" id="bank-chip" draggable="true">1h</div>
   </div>
 
-  <div class="circles-container" id="circlesContainer">
-    <!-- 6 drop zones -->
-  </div>
+  <div id="targets" class="circles-container"></div>
 
-  <script>
-    const chipsContainer = document.getElementById('chipsContainer');
-    const chipCountDisplay = document.getElementById('chipCount');
-    const circlesContainer = document.getElementById('circlesContainer');
-    let selectedChip = null;
-    let remainingChips = 24;
+<script>
+  const maxChips = 24;
+  let chipsUsed = 0;
 
-    // Create 24 chips
-    for (let i = 1; i <= 24; i++) {
-      const chip = document.createElement('div');
-      chip.className = 'chip';
-      chip.textContent = '1h';
-      chip.id = `chip${i}`;
-      chip.addEventListener('click', () => {
-        // Deselect any other chip
-        document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
-        selectedChip = chip;
-        chip.classList.add('selected');
-      });
-      chipsContainer.appendChild(chip);
+  const bank = document.getElementById('bank');
+  const bankChip = document.getElementById('bank-chip');
+  const chipUsedDisplay = document.getElementById('chipUsed');
+  const targets = document.getElementById('targets');
+
+  // Create 6 circles with input labels
+  for(let i=0; i<6; i++) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'circle-area';
+
+    const circle = document.createElement('div');
+    circle.className = 'drop-circle';
+    circle.id = 'circle-' + i;
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.placeholder = 'Add label';
+    labelInput.className = 'label-box';
+
+    wrapper.appendChild(circle);
+    wrapper.appendChild(labelInput);
+    targets.appendChild(wrapper);
+  }
+
+  // Sortable for bank - clone on drag, allow put to receive chips dragged back
+  const sortableBank = new Sortable(bank, {
+    group: {
+      name: 'chips',
+      pull: 'clone',
+      put: true
+    },
+    sort: false,
+    animation: 150,
+    onAdd: evt => {
+      // Removing chip from circle by dragging back to bank
+      chipsUsed--;
+      updateCounter();
+      enableBankDragIfNeeded();
     }
+  });
 
-    // Create 6 circle areas
-    for (let i = 0; i < 6; i++) {
-      const circleArea = document.createElement('div');
-      circleArea.className = 'circle-area';
-
-      const dropCircle = document.createElement('div');
-      dropCircle.className = 'drop-circle';
-
-      dropCircle.addEventListener('click', () => {
-        if (selectedChip && selectedChip.parentNode === chipsContainer) {
-          // Move chip into the dropCircle
-          const placedChip = selectedChip.cloneNode(true);
-          placedChip.classList.remove('selected');
-          placedChip.classList.add('dropped');
-          placedChip.style.pointerEvents = 'none';
-          dropCircle.appendChild(placedChip);
-
-          // Remove original from bank
-          chipsContainer.removeChild(selectedChip);
-          selectedChip = null;
-
-          remainingChips--;
-          chipCountDisplay.textContent = remainingChips;
+  // Sortable for circles
+  const circleElems = document.querySelectorAll('.drop-circle');
+  circleElems.forEach(circle => {
+    new Sortable(circle, {
+      group: {
+        name: 'chips',
+        pull: true,
+        put: true
+      },
+      animation: 150,
+      onAdd: evt => {
+        chipsUsed++;
+        updateCounter();
+        if(chipsUsed >= maxChips) {
+          disableBankDrag();
         }
-      });
+      },
+      onRemove: evt => {
+        chipsUsed--;
+        updateCounter();
+        enableBankDragIfNeeded();
+      }
+    });
+  });
 
-      const labelInput = document.createElement('input');
-      labelInput.className = 'label-box';
-      labelInput.placeholder = 'Add label';
-
-      circleArea.appendChild(dropCircle);
-      circleArea.appendChild(labelInput);
-      circlesContainer.appendChild(circleArea);
+  // Disable dragging from bank when max used
+  function disableBankDrag() {
+    bankChip.style.opacity = 0.4;
+    bankChip.style.pointerEvents = 'none';
+  }
+  // Enable dragging from bank if under max
+  function enableBankDragIfNeeded() {
+    if(chipsUsed < maxChips) {
+      bankChip.style.opacity = 1;
+      bankChip.style.pointerEvents = 'auto';
     }
-  </script>
+  }
+  // Update counter display
+  function updateCounter() {
+    chipUsedDisplay.textContent = chipsUsed;
+  }
+</script>
 </body>
 </html>
